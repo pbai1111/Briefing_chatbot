@@ -9,8 +9,14 @@
 !google_auth.py
 !submitted_brief.csv
 
-# Ignore everything in templates folder...
+# ============ TEMPLATES HANDLING ============
+# 1) Ignore the entire templates folder
+templates/
+# 2) Unignore the templates folder itself
+!templates/
+
+# 3) Ignore everything inside templates
 templates/*
 
-# ...except for edit_signage.html
+# 4) Unignore ONLY edit_signage.html
 !templates/edit_signage.html
