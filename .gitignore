@@ -1,0 +1,16 @@
+# Ignore EVERYTHING by default
+*
+
+# Un-ignore .gitignore itself
+!.gitignore
+
+# Un-ignore main project files
+!app.py
+!google_auth.py
+!submitted_brief.csv
+
+# Ignore everything in templates folder...
+templates/*
+
+# ...except for edit_signage.html
+!templates/edit_signage.html
