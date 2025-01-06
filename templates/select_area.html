@@ -1,0 +1,31 @@
+<form id="areaForm">
+    <label for="area">Select an Area:</label>
+    <select id="area" name="area">
+        <option value="Race Week">Race Week</option>
+        <option value="Start">Start</option>
+        <option value="Finish">Finish</option>
+        <option value="Course">Course</option>
+        <option value="Transportation">Transportation</option>
+        <option value="Volunteer">Volunteer</option>
+        <option value="Membership">Membership</option>
+        <option value="Pavilion">Pavilion</option>
+        <option value="Expo">Expo</option>
+        <!-- Add more areas as needed -->
+    </select>
+    <button type="submit">Submit</button>
+</form>
+
+<script>
+    // Attach an event listener to the form
+    const form = document.getElementById('areaForm');
+    form.addEventListener('submit', (e) => {
+        e.preventDefault(); // Prevent default form submission
+        const selectedArea = document.getElementById('area').value;
+        if (selectedArea) {
+            // Redirect to the edit_signage/<area> route
+            window.location.href = `/edit_signage/${encodeURIComponent(selectedArea)}`;
+        } else {
+            alert("Please select an area!");
+        }
+    });
+</script>
