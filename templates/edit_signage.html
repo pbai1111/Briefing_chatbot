@@ -305,30 +305,46 @@
     </script>
 <script>
     document.querySelector('form[action="/submit_signage"]').addEventListener('submit', async function(event) {
-        event.preventDefault(); // Prevent the default form submission
+    event.preventDefault(); // Prevent default form submission
 
-        const formData = new FormData(event.target);
-        const formObject = Object.fromEntries(formData.entries());
+    const tableBody = document.getElementById('signage-table-body');
+    const rows = Array.from(tableBody.querySelectorAll('tr')); // Collect all rows
+    const formData = {};
 
-        try {
-            const response = await fetch('/submit_signage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formObject),
-            });
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('[name]'); // Select all inputs and selects in the row
+        inputs.forEach(input => {
+            const name = input.name;
+            const value = input.value;
 
-            const result = await response.json();
-
-            if (result.success) {
-                alert(result.message); // Show the confirmation message
-            } else {
-                alert(`Error: ${result.error}`);
+            // Ensure each name becomes a list of values in formData
+            if (!formData[name]) {
+                formData[name] = [];
             }
-        } catch (error) {
-            console.error('Error submitting signage:', error);
-            alert('An error occurred while submitting the signage.');
-        }
+            formData[name].push(value);
+        });
     });
+
+    try {
+        const response = await fetch('/submit_signage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData), // Send all rows as JSON
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert(result.message); // Show the confirmation message
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error submitting signage:', error);
+        alert('An error occurred while submitting the signage.');
+    }
+});
+
 </script>
 
 

@@ -132,7 +132,7 @@ def submit_signage():
             if len(values) < max_length:
                 submitted_data[key].extend([""] * (max_length - len(values)))
 
-        # The rest of your existing logic goes here...
+        # Initialize rows for appending to the master sheet
         rows = []
         MASTER_SHEET_ID = '1xIG0vHm1LbPj4kQqD501ewuO9x-bUvGHRg9TuJKZEYU'
         MASTER_RANGE_NAME = 'Sheet1!A2:V1000'
@@ -155,6 +155,11 @@ def submit_signage():
                 # Ensure all fields have default values
                 row_data = {key: submitted_data.get(key, [""])[index] for key in submitted_data}
                 row_data.setdefault('ACTIONS', 'this is a new sign')  # Default action
+
+                # Skip rows marked for deletion
+                if row_data.get('ACTIONS', '').strip().lower() == 'do not need to create this sign this year'.lower():
+                    print(f"Row {index}: Marked for deletion, skipping.")
+                    continue
 
                 # Generate the new Current Item #
                 current_item_number = f"NYM25_{str(current_index).zfill(3)}"
@@ -193,7 +198,7 @@ def submit_signage():
                 # Add the row to the list
                 rows.append(row)
 
-            except IndexError as e:
+            except IndexError as e:  # Catch IndexError specifically for row issues
                 print(f"Error processing row at index {index}: {e}")
                 continue  # Skip problematic rows
 
