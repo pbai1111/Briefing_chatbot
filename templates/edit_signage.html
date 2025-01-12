@@ -303,21 +303,20 @@
     }
 }
     </script>
+
 <script>
     document.querySelector('form[action="/submit_signage"]').addEventListener('submit', async function(event) {
-    event.preventDefault(); // Prevent default form submission
+    event.preventDefault();
 
     const tableBody = document.getElementById('signage-table-body');
-    const rows = Array.from(tableBody.querySelectorAll('tr')); // Collect all rows
+    const rows = Array.from(tableBody.querySelectorAll('tr'));
     const formData = {};
 
     rows.forEach(row => {
-        const inputs = row.querySelectorAll('[name]'); // Select all inputs and selects in the row
+        const inputs = row.querySelectorAll('[name]');
         inputs.forEach(input => {
             const name = input.name;
-            const value = input.value;
-
-            // Ensure each name becomes a list of values in formData
+            const value = input.value.trim();
             if (!formData[name]) {
                 formData[name] = [];
             }
@@ -329,13 +328,19 @@
         const response = await fetch('/submit_signage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData), // Send all rows as JSON
+            body: JSON.stringify(formData),
         });
 
         const result = await response.json();
 
         if (result.success) {
-            alert(result.message); // Show the confirmation message
+            alert(result.message);
+            if (result.csv_file) {
+                const link = document.createElement('a');
+                link.href = result.csv_file;
+                link.download = 'submitted_brief.csv';
+                link.click();
+            }
         } else {
             alert(`Error: ${result.error}`);
         }
@@ -345,7 +350,15 @@
     }
 });
 
-</script>
+ </script>
+ 
+ <!-- Add autocomplete attribute to form fields -->
+ <script>
+    document.querySelectorAll('input, select').forEach(field => {
+        field.setAttribute('autocomplete', 'off');
+    });
+ </script>
+ 
 
 
 </body>

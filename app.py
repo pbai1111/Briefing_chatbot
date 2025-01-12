@@ -3,15 +3,12 @@ from flask_mail import Mail, Message
 from google_auth import read_sheet_data, filter_data_by_area, append_to_master_sheet, authenticate_with_oauth, write_to_google_doc
 from googleapiclient.discovery import build
 import os
+import shutil  # For moving files
 import csv
 from datetime import datetime
 
 app = Flask(__name__)
 
-from flask import Flask
-from flask_mail import Mail
-
-app = Flask(__name__)
 
 # Email Configuration
 app.config.update(
@@ -102,24 +99,20 @@ def submit_signage():
     """Process edited signage data, assign unique item numbers, append to Master Sheet, and generate a copy."""
     try:
         # Retrieve submitted data as JSON
-        submitted_data = request.get_json()  # Safely parse JSON data
-        print(f"Submitted Data (JSON): {submitted_data}")
+        if request.content_type == 'application/json':
+            submitted_data = request.get_json()  # JSON data
+            print(f"Submitted Data (JSON): {submitted_data}")
+        else:
+            submitted_data = request.form.to_dict(flat=False)  # Form-encoded data
+            print(f"Submitted Data (Form): {submitted_data}")
 
-        # Validate that the submitted data is in the correct format
-        if not isinstance(submitted_data, dict):
-            return jsonify({
-                "success": False,
-                "error": "Submitted data is not in the correct format."
-            }), 400
-
-        # Ensure submitted data isn't empty
+        # Validate and normalize data
         if not submitted_data:
-            return jsonify({
-                "success": False,
-                "error": "No data was submitted. Please check your form input."
-            }), 400
+            return jsonify({"success": False, "error": "No data submitted. Please check your form input."}), 400
 
-        # Normalize field names to uppercase and ensure all values are lists
+        if not isinstance(submitted_data, dict):
+            return jsonify({"success": False, "error": "Submitted data is not in the correct format."}), 400
+
         submitted_data = {
             key.upper(): value if isinstance(value, list) else [value]
             for key, value in submitted_data.items()
@@ -137,43 +130,30 @@ def submit_signage():
         MASTER_SHEET_ID = '1xIG0vHm1LbPj4kQqD501ewuO9x-bUvGHRg9TuJKZEYU'
         MASTER_RANGE_NAME = 'Sheet1!A2:V1000'
 
-        # Log field alignment and lengths
-        for key, values in submitted_data.items():
-            print(f"Key: {key}, Values: {values[:5]} (Length: {len(values)})")
-
         # Retrieve existing data for unique item numbers
         existing_data = read_sheet_data(MASTER_SHEET_ID, MASTER_RANGE_NAME)
         print(f"Existing Data Retrieved: {len(existing_data)} rows")
-
-        # Extract existing item numbers for reference
-        existing_item_numbers = [row[2] for row in existing_data if len(row) > 2]
-        current_index = len(existing_item_numbers) + 1
+        current_index = len(existing_data) + 1
 
         # Construct rows based on submitted data
         for index in range(len(submitted_data.get('TYPE OF SIGN', []))):
             try:
-                # Ensure all fields have default values
                 row_data = {key: submitted_data.get(key, [""])[index] for key in submitted_data}
-                row_data.setdefault('ACTIONS', 'this is a new sign')  # Default action
+                row_data.setdefault('ACTIONS', 'this is a new sign')
 
-                # Skip rows marked for deletion
                 if row_data.get('ACTIONS', '').strip().lower() == 'do not need to create this sign this year'.lower():
-                    print(f"Row {index}: Marked for deletion, skipping.")
+                    print(f"Row {index + 1}: Marked for deletion, skipping.")
                     continue
 
-                # Generate the new Current Item #
                 current_item_number = f"NYM25_{str(current_index).zfill(3)}"
                 current_index += 1
-
-                # Add timestamp to the row
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-                # Construct the row
                 row = [
-                    timestamp,  # Timestamp as the first column
+                    timestamp,
                     row_data.get('TYPE OF SIGN', ""),
                     row_data.get('PAST ITEM #', ""),
-                    current_item_number,  # Current Item #
+                    current_item_number,
                     row_data.get('BRIEFER', ""),
                     row_data.get('GL CODE', ""),
                     row_data.get('UNIQUE NAME OF ASSET', ""),
@@ -195,31 +175,51 @@ def submit_signage():
                     row_data.get('ACTIONS', "")
                 ]
 
-                # Add the row to the list
                 rows.append(row)
 
-            except IndexError as e:  # Catch IndexError specifically for row issues
+            except IndexError as e:
                 print(f"Error processing row at index {index}: {e}")
-                continue  # Skip problematic rows
+                continue
 
         print(f"Rows to Append: {rows[:5]}")
 
-        # Append to the Master Sheet
+        # Append rows to the Master Sheet
         append_to_master_sheet(MASTER_SHEET_ID, MASTER_RANGE_NAME, rows)
         print(f"Appended {len(rows)} rows to the Master Sheet.")
 
-        # Return success confirmation
+       # Generate the CSV file
+        output_file = "submitted_brief.csv"
+        with open(output_file, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                "Timestamp", "TYPE OF SIGN", "Past ITEM #", "Current ITEM #", "BRIEFER", "GL CODE",
+                "UNIQUE NAME OF ASSET", "MANDATORY LOGOS", "DESIGN NOTES AND COPY",
+                "SIGNAGE DECK PAGE #", "AREA", "TOTAL QTY FOR RACE", "QTY IN INVENTORY",
+                "QTY TO PRODUCE", "SIDES", "MATERIAL", "DIMENSIONS (WIDTH - INCHES)",
+                "DIMENSIONS (HEIGHT - INCHES)", "DIMENSIONS (DEPTH)", "FINISHING",
+                "DELIVERY ADDRESS", "AFTER LIFE", "ACTIONS"
+            ])
+            writer.writerows(rows)
+        print(f"CSV Generated at {output_file}")
+
+        # Move the CSV file to the /static directory
+        static_folder = os.path.join(os.getcwd(), "static")
+        if not os.path.exists(static_folder):
+            os.makedirs(static_folder)  # Create the static folder if it doesn't exist
+        static_output_file = os.path.join(static_folder, output_file)
+        shutil.move(output_file, static_output_file)
+        print(f"CSV moved to {static_output_file}")
+
+        # Return JSON response with a link to the CSV
         return jsonify({
             "success": True,
-            "message": f"{len(rows)} items have been successfully added to the master sheet."
+            "message": f"{len(rows)} items have been successfully added to the master sheet.",
+            "csv_file": f"/static/{output_file}"
         })
 
     except Exception as e:
         print(f"Error in submit_signage: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # New route to recommend specifications for a new sign
