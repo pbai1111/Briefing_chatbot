@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 import os
 import shutil  # For moving files
 import csv
+import hashlib
 from datetime import datetime
 
 app = Flask(__name__)
@@ -92,6 +93,22 @@ def get_sign_types(area):
     except Exception as e:
         print(f"Error fetching sign types: {e}")
         return jsonify({"error": "Could not fetch sign types", "details": str(e)}), 500
+    
+# Create hash 
+def generate_sign_hash(sign):
+    """
+    Generate a unique hash for a sign based on its attributes.
+    """
+    hash_input = f"{sign['AREA']}-{sign['TYPE OF SIGN']}-{sign['DIMENSIONS (WIDTH - INCHES)']}-{sign['DIMENSIONS (HEIGHT - INCHES)']}-{sign['SIDES']}-{sign['MATERIAL']}-{sign['DESIGN NOTES AND COPY']}"
+    return hashlib.md5(hash_input.encode('utf-8')).hexdigest()
+
+def is_duplicate(sign, existing_signs):
+    """
+    Check if a sign is a duplicate based on its hash.
+    """
+    sign_hash = generate_sign_hash(sign)
+    existing_hashes = {generate_sign_hash(s) for s in existing_signs}
+    return sign_hash in existing_hashes
 
 # Route to process form submissions
 @app.route('/submit_signage', methods=['POST'])
@@ -119,6 +136,11 @@ def submit_signage():
         }
         print(f"Normalized Data: {submitted_data}")
 
+        # Process submitted rows
+        unique_rows = []
+        duplicates = []
+
+
         # Ensure all fields have consistent lengths
         max_length = max((len(values) for values in submitted_data.values()), default=0)
         for key, values in submitted_data.items():
@@ -126,9 +148,15 @@ def submit_signage():
                 submitted_data[key].extend([""] * (max_length - len(values)))
 
         # Initialize rows for appending to the master sheet
-        rows = []
+        for index in range(len(submitted_data.get('TYPE OF SIGN', []))):
+            row_data = {key: submitted_data.get(key, [""])[index] for key in submitted_data}
+            if not is_duplicate(row_data, existing_signs):
+                unique_rows.append(row_data)
+            else:
+                duplicates.append(row_data)
         MASTER_SHEET_ID = '1xIG0vHm1LbPj4kQqD501ewuO9x-bUvGHRg9TuJKZEYU'
         MASTER_RANGE_NAME = 'Sheet1!A2:V1000'
+        
 
         # Retrieve existing data for unique item numbers
         existing_data = read_sheet_data(MASTER_SHEET_ID, MASTER_RANGE_NAME)
@@ -421,8 +449,6 @@ def write_to_google_doc(sheet_id, range_name, rows):
     except Exception as e:
         print(f"Error saving draft: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
-
 
 
 if __name__ == "__main__":

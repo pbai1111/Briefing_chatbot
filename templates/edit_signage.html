@@ -359,6 +359,46 @@
     });
  </script>
  
+ <script>
+    function checkForDuplicates(rows) {
+    const seen = new Set();
+    const duplicates = new Set();
+    rows.forEach((row, index) => {
+        const key = `${row['AREA']}-${row['TYPE OF SIGN']}-${row['DIMENSIONS (WIDTH - INCHES)']}-${row['DIMENSIONS (HEIGHT - INCHES)']}-${row['SIDES']}-${row['MATERIAL']}-${row['DESIGN NOTES AND COPY']}`;
+        if (seen.has(key)) {
+            duplicates.add(index + 1); // Add 1 to make row numbers human-readable
+        } else {
+            seen.add(key);
+        }
+    });
+
+    if (duplicates.size > 0) {
+        alert(`Duplicates found in rows: ${Array.from(duplicates).join(', ')}`);
+        return true; // Indicate duplicates exist
+    }
+
+    return false; // No duplicates
+}
+
+document.querySelector('form[action="/submit_signage"]').addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    const tableBody = document.getElementById('signage-table-body');
+    const rows = Array.from(tableBody.querySelectorAll('tr')).map(row => {
+        const inputs = row.querySelectorAll('[name]');
+        const rowData = {};
+        inputs.forEach(input => {
+            rowData[input.name] = input.value.trim();
+        });
+        return rowData;
+    });
+
+    if (!checkForDuplicates(rows)) {
+        this.submit(); // Submit the form if no duplicates are found
+    }
+});
+
+</script>
 
 
 </body>
